@@ -39,6 +39,38 @@ header {
 .course { margin: 0 0 4px; color: var(--muted); font-size: .88rem; }
 h1 { margin: 0; font-size: clamp(1.65rem, 4.5vw, 2.15rem); letter-spacing: -.035em; line-height: 1.17; }
 .bank-picker { display: flex; align-items: center; gap: 3px; }
+.header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 10px; }
+.account-link {
+  background: white;
+  border-color: transparent;
+  color: var(--accent-dark);
+  min-height: 36px;
+  padding: 5px 8px;
+  font-size: .86rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.account-link:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-dark); }
+.account-sync { color: var(--muted); font-size: .81rem; }
+.account-dialog {
+  width: min(calc(100% - 30px), 410px);
+  max-height: calc(100% - 30px);
+  padding: 20px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  color: var(--ink);
+  background: white;
+}
+.account-dialog::backdrop { background: rgb(32 36 40 / .26); }
+.account-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.account-dialog h2 { margin: 0; font-size: 1.24rem; }
+.account-dialog p { margin: 10px 0; line-height: 1.45; overflow-wrap: anywhere; }
+.account-form { display: grid; gap: 12px; margin-top: 14px; }
+.account-form label { display: grid; gap: 5px; font-size: .9rem; font-weight: 650; }
+.account-form input { width: 100%; padding: 8px; border: 1px solid var(--rule); border-radius: 5px; }
+.account-options { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 8px; }
+.account-notice { color: var(--accent-dark); font-size: .9rem; }
+.account-notice[data-error='true'] { color: var(--bad); }
 .bank-picker button {
   min-height: 36px;
   padding: 5px 9px;
@@ -539,9 +571,13 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
       <p class="course">EE2 · Modelamiento Predictivo de Datos</p>
       <h1>Práctica por rondas</h1>
     </div>
-    <div class="bank-picker" role="group" aria-label="Elegir balotario">
-      <button type="button" data-bank="general" aria-pressed="false">General</button>
-      <button type="button" data-bank="profesor" aria-pressed="false">Profesor</button>
+    <div class="header-actions">
+      <div class="bank-picker" role="group" aria-label="Elegir balotario">
+        <button type="button" data-bank="general" aria-pressed="false">General</button>
+        <button type="button" data-bank="profesor" aria-pressed="false">Profesor</button>
+      </div>
+      <button class="account-link" type="button" id="account-entry" hidden>Entrar</button>
+      <span class="account-sync" id="account-sync" role="status" hidden></span>
     </div>
   </header>
   <main>
@@ -588,6 +624,20 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
     <noscript>Activa JavaScript en el navegador para usar el cuestionario.</noscript>
   </main>
 </div>
+<dialog class="account-dialog" id="account-dialog" aria-labelledby="account-title">
+  <div class="account-dialog-head">
+    <h2 id="account-title">Iniciar sesión</h2>
+    <button class="account-link" id="account-close" type="button">Cerrar</button>
+  </div>
+  <p id="account-description"></p>
+  <form class="account-form" id="account-form" hidden>
+    <label>Correo electrónico <input id="account-email" type="email" required autocomplete="email" maxlength="254"></label>
+    <label id="account-password-row">Contraseña <input id="account-password" type="password" required autocomplete="current-password" maxlength="128"></label>
+    <button id="account-submit" type="submit">Entrar</button>
+  </form>
+  <div class="account-options" id="account-options"></div>
+  <p class="account-notice" id="account-notice" role="status" hidden></p>
+</dialog>
 <script type="application/json" id="question-bank">[
   {
     "id": 1,
@@ -6750,7 +6800,9 @@ const banks = {
   profesor: makeBank('profesor', 'Profesor', 'profesor-bank', 'mpd-ee2-practica-profesor-v1'),
 };
 const preferenceKey = 'mpd-ee2-balotario-v1';
-const sessions = new Map();
+const guestSessions = new Map();
+let sessions = guestSessions;
+let saveAccountProgress = null;
 const bankButtons = [...document.querySelectorAll('[data-bank]')];
 const panel = document.getElementById('panel');
 const practicePage = document.getElementById('practice-page');
@@ -6804,47 +6856,104 @@ function selectBank(name) {
   render();
 }
 
-function validSelection(id, selected, allowEmpty = false) {
-  const question = activeBank.byId.get(id);
+function validSelection(bank, id, selected) {
+  const question = bank.byId.get(id);
   return Boolean(question && Array.isArray(selected) &&
-    (allowEmpty || selected.length > 0) &&
+    selected.length > 0 &&
     (question.correct.length > 1 || selected.length <= 1) &&
     new Set(selected).size === selected.length &&
     selected.every(value => question.options.some(option => option.key === value)));
 }
 
-function restoreSession() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(activeBank.storageKey));
-    if (saved && Number.isInteger(saved.round) && saved.round >= 1 &&
-        Array.isArray(saved.ids) && saved.ids.length &&
-        new Set(saved.ids).size === saved.ids.length && saved.ids.every(id => activeBank.byId.has(id)) &&
-        Number.isInteger(saved.cursor) && saved.cursor >= 0 && saved.cursor <= saved.ids.length &&
-        Array.isArray(saved.answers) && saved.answers.length >= saved.cursor &&
-        saved.answers.length <= Math.min(saved.cursor + 1, saved.ids.length) &&
-        saved.answers.every((answer, index) => validSelection(saved.ids[index], answer)) &&
-        Array.isArray(saved.draft) &&
-        (saved.draft.length === 0 || validSelection(saved.ids[saved.cursor], saved.draft))) {
-      if (!Number.isInteger(saved.reviewCursor) || saved.reviewCursor < 0 ||
-          saved.reviewCursor >= saved.cursor || saved.cursor === saved.ids.length) {
-        delete saved.reviewCursor;
-      }
-      return saved;
+function validateSession(bank, saved) {
+  if (saved && Number.isInteger(saved.round) && saved.round >= 1 &&
+      Array.isArray(saved.ids) && saved.ids.length &&
+      new Set(saved.ids).size === saved.ids.length && saved.ids.every(id => bank.byId.has(id)) &&
+      Number.isInteger(saved.cursor) && saved.cursor >= 0 && saved.cursor <= saved.ids.length &&
+      Array.isArray(saved.answers) && saved.answers.length >= saved.cursor &&
+      saved.answers.length <= Math.min(saved.cursor + 1, saved.ids.length) &&
+      saved.answers.every((answer, index) => validSelection(bank, saved.ids[index], answer)) &&
+      Array.isArray(saved.draft) &&
+      (saved.draft.length === 0 || validSelection(bank, saved.ids[saved.cursor], saved.draft))) {
+    const { round, ids, cursor, answers, draft, reviewCursor } = saved;
+    const result = { round, ids, cursor, answers, draft };
+    if (Number.isInteger(reviewCursor) && reviewCursor >= 0 &&
+        reviewCursor < cursor && cursor < ids.length) {
+      result.reviewCursor = reviewCursor;
     }
-  } catch {
-    // Keep the quiz usable when the browser blocks local storage.
+    return result;
   }
-  return freshSession();
+  return null;
 }
 
-function persist() {
+function readGuestSession(bank) {
+  try {
+    return validateSession(bank, JSON.parse(localStorage.getItem(bank.storageKey)));
+  } catch {
+    return null;
+  }
+}
+
+function restoreSession() {
+  return (sessions === guestSessions && readGuestSession(activeBank)) || freshSession();
+}
+
+function persist(sync = true) {
   sessions.set(activeBank, session);
+  if (saveAccountProgress) {
+    if (sync) saveAccountProgress(activeBank.id, snapshot(session));
+    return;
+  }
   try {
     localStorage.setItem(activeBank.storageKey, JSON.stringify(session));
   } catch {
     // The active round is still available in memory.
   }
 }
+
+function snapshot({ round, ids, cursor, answers }) {
+  return JSON.stringify({ round, ids, cursor, answers, draft: [] });
+}
+
+function replaceActiveSession() {
+  session = sessions.get(activeBank) ?? restoreSession();
+  sessions.set(activeBank, session);
+  render();
+  showPage();
+}
+
+const quizProgress = {
+  guest(id) {
+    const bank = banks[id];
+    const saved = guestSessions.get(bank) ?? readGuestSession(bank);
+    return saved && (saved.round > 1 || saved.answers.length) ? snapshot(saved) : null;
+  },
+  decode(id, text) {
+    try {
+      return validateSession(banks[id], JSON.parse(text));
+    } catch {
+      return null;
+    }
+  },
+  enter(values, save) {
+    sessions = new Map();
+    for (const [id, value] of values) if (value) sessions.set(banks[id], value);
+    saveAccountProgress = save;
+    replaceActiveSession();
+  },
+  replace(id, value) {
+    const bank = banks[id];
+    if (value) sessions.set(bank, value);
+    else sessions.delete(bank);
+    if (bank === activeBank) replaceActiveSession();
+  },
+  leave() {
+    if (sessions === guestSessions) return;
+    sessions = guestSessions;
+    saveAccountProgress = null;
+    replaceActiveSession();
+  },
+};
 
 function isCorrect(question, selected) {
   return Boolean(selected && selected.length === question.correct.length &&
@@ -6991,14 +7100,14 @@ function renderQuestion(focusTarget) {
   options.addEventListener('change', () => {
     session.draft = [...options.querySelectorAll('input:checked')].map(input => input.value);
     button.disabled = !session.draft.length;
-    persist();
+    persist(false);
   });
   form.addEventListener('submit', event => {
     event.preventDefault();
     if (index < session.cursor) {
       if (index + 1 === session.cursor) delete session.reviewCursor;
       else session.reviewCursor = index + 1;
-      persist();
+      persist(false);
       render('heading');
       return;
     }
@@ -7337,7 +7446,7 @@ previousButton.addEventListener('click', () => {
   const index = displayedQuestionIndex();
   if (index === 0 || session.cursor === session.ids.length) return;
   session.reviewCursor = index - 1;
-  persist();
+  persist(false);
   render('heading');
 });
 
@@ -7349,6 +7458,10 @@ bankButtons.forEach(button => {
 selectBank(preferredBank());
 showPage();
 window.addEventListener('hashchange', () => showPage(true));
+if (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+  import('./quiz-account.js').then(({ connectAccounts }) => connectAccounts(quizProgress))
+    .catch(error => console.warn('El acceso a cuentas no está disponible.', error.code ?? error.name));
+}
 </script>
 </body>
 </html>
