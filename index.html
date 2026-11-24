@@ -51,6 +51,9 @@ h1 { margin: 0; font-size: clamp(1.65rem, 4.5vw, 2.15rem); letter-spacing: -.035
   text-underline-offset: 3px;
 }
 .account-link:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-dark); }
+#account-entry { display: grid; gap: 2px; justify-items: start; text-decoration: none; }
+#account-entry-label { text-decoration: underline; text-underline-offset: 3px; }
+#account-entry-hint { color: var(--muted); font-size: .73rem; font-weight: 400; }
 .account-sync { color: var(--muted); font-size: .81rem; }
 .account-dialog {
   width: min(calc(100% - 30px), 410px);
@@ -576,7 +579,10 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
         <button type="button" data-bank="general" aria-pressed="false">General</button>
         <button type="button" data-bank="profesor" aria-pressed="false">Profesor</button>
       </div>
-      <button class="account-link" type="button" id="account-entry" hidden>Entrar</button>
+      <button class="account-link" type="button" id="account-entry" aria-labelledby="account-entry-label" aria-describedby="account-entry-hint" hidden>
+        <span id="account-entry-label">Ingresa a tu cuenta</span>
+        <span id="account-entry-hint">Guarda tu progreso</span>
+      </button>
       <span class="account-sync" id="account-sync" role="status" hidden></span>
     </div>
   </header>

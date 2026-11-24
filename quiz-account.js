@@ -28,7 +28,7 @@ export async function connectAccounts(quiz) {
   const actionSettings = { url: location.origin + location.pathname };
 
   const ui = Object.fromEntries([
-    'entry', 'sync', 'dialog', 'title', 'close', 'description', 'form', 'email',
+    'entry', 'entry-label', 'entry-hint', 'sync', 'dialog', 'title', 'close', 'description', 'form', 'email',
     'password', 'password-row', 'submit', 'options', 'notice',
   ].map(id => [id, document.getElementById('account-' + id)]));
 
@@ -81,7 +81,8 @@ export async function connectAccounts(quiz) {
   function render() {
     renderIndicator();
     ui.options.replaceChildren();
-    ui.entry.textContent = owner ? 'Mi cuenta' : 'Entrar';
+    ui['entry-label'].textContent = owner ? 'Mi cuenta' : 'Ingresa a tu cuenta';
+    ui['entry-hint'].hidden = Boolean(owner);
     ui.form.hidden = Boolean(owner);
     ui.submit.disabled = busy;
     if (!owner) {
