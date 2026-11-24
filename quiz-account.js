@@ -81,8 +81,11 @@ export async function connectAccounts(quiz) {
   function render() {
     renderIndicator();
     ui.options.replaceChildren();
-    ui['entry-label'].textContent = owner ? 'Mi cuenta' : 'Ingresa a tu cuenta';
-    ui['entry-hint'].hidden = Boolean(owner);
+    const label = ui['entry-label'] ?? ui.entry;
+    label.textContent = owner ? 'Mi cuenta' : 'Ingresa a tu cuenta';
+    if (ui['entry-hint']) ui['entry-hint'].hidden = Boolean(owner);
+    if (owner) ui.entry.removeAttribute('aria-describedby');
+    else if (ui['entry-hint']) ui.entry.setAttribute('aria-describedby', 'account-entry-hint');
     ui.form.hidden = Boolean(owner);
     ui.submit.disabled = busy;
     if (!owner) {

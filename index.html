@@ -7465,7 +7465,7 @@ selectBank(preferredBank());
 showPage();
 window.addEventListener('hashchange', () => showPage(true));
 if (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-  import('./quiz-account.js').then(({ connectAccounts }) => connectAccounts(quizProgress))
+  import('./quiz-account.js?v=2').then(({ connectAccounts }) => connectAccounts(quizProgress))
     .catch(error => console.warn('El acceso a cuentas no está disponible.', error.code ?? error.name));
 }
 </script>
