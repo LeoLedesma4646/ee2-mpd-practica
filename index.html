@@ -51,9 +51,18 @@ h1 { margin: 0; font-size: clamp(1.65rem, 4.5vw, 2.15rem); letter-spacing: -.035
   text-underline-offset: 3px;
 }
 .account-link:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-dark); }
-#account-entry { display: grid; gap: 2px; justify-items: start; text-decoration: none; }
-#account-entry-label { text-decoration: underline; text-underline-offset: 3px; }
-#account-entry-hint { color: var(--muted); font-size: .73rem; font-weight: 400; }
+#account-entry {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  padding: 7px 10px;
+  border: 1px solid #c9dbe8;
+  background: #f1f7fb;
+  color: #24455f;
+  text-decoration: none;
+}
+#account-entry:hover:not(:disabled) { background: #e6f0f7; border-color: #a8c3d7; }
+#account-entry-hint { color: #4c6273; font-size: .73rem; font-weight: 400; }
 .account-sync { color: var(--muted); font-size: .81rem; }
 .account-dialog {
   width: min(calc(100% - 30px), 410px);
